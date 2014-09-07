@@ -45,10 +45,10 @@
             // 
             // render
             // 
-            this.render.BackColor = System.Drawing.Color.Black;
+            this.render.BackColor = System.Drawing.Color.White;
             this.render.Location = new System.Drawing.Point(0, 0);
             this.render.Name = "render";
-            this.render.Size = new System.Drawing.Size(2000, 2000);
+            this.render.Size = new System.Drawing.Size(3000, 4000);
             this.render.TabIndex = 0;
             this.render.Paint += new System.Windows.Forms.PaintEventHandler(this.render_Paint);
             // 

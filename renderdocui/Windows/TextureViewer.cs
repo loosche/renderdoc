@@ -34,6 +34,7 @@ using System.Windows.Forms;
 using WeifenLuo.WinFormsUI.Docking;
 using renderdocui.Code;
 using renderdocui.Controls;
+using renderdocui.Windows.Dialogs;
 using renderdoc;
 using System.Threading;
 
@@ -2404,9 +2405,6 @@ namespace renderdocui.Windows
 
         private void zoomRange_Click(object sender, EventArgs e)
         {
-            var t = new Windows.Dialogs.PixelHistorTree();
-            t.Show(DockPanel);
-
             float black = rangeHistogram.BlackPoint;
             float white = rangeHistogram.WhitePoint;
 
@@ -2645,18 +2643,6 @@ namespace renderdocui.Windows
 
         private Dictionary<ResourceId, PixelModification[]> historyCache = null;
 
-        class PixelTreeNode
-        {
-            public uint eventID = 0;
-
-            public List<PixelTreeNode> sources = new List<PixelTreeNode>();
-
-            public bool leaftex = true;
-
-            public FetchTexture res = null;
-            public PixelValue value = null;
-        };
-
         private FetchTexture GetTex(ResourceId tex)
         {
             foreach (var t in m_Core.CurTextures)
@@ -2676,7 +2662,6 @@ namespace renderdocui.Windows
             if(tex == ResourceId.Null)
                 return new PixelModification[0] { };
             var fetchtex = GetTex(tex);
-
             
             float curaspect = (float)CurrentTexture.width / (float)CurrentTexture.height;
             float newaspect = (float)fetchtex.width / (float)fetchtex.height;
@@ -2702,28 +2687,30 @@ namespace renderdocui.Windows
             public uint EID;
         };
 
-        private Dictionary<TexAtEvent, PixelTreeNode> nodeCache = null;
+        private Dictionary<TexAtEvent, PixelHistorTree.PixelTreeNode> texnodeCache = null;
+        private Dictionary<uint, PixelHistorTree.PixelTreeNode> modnodeCache = null;
 
-        private PixelTreeNode PixelHistorTree_recurse(ReplayRenderer r, ResourceId tex, uint eventID)
+        private PixelHistorTree.PixelTreeNode PixelHistorTree_recurse(ReplayRenderer r, ResourceId tex, uint eventID)
         {
             TexAtEvent key = new TexAtEvent(tex, eventID);
 
-            if (nodeCache.ContainsKey(key))
-                return nodeCache[key];
+            if (texnodeCache.ContainsKey(key))
+                return texnodeCache[key];
 
-            PixelTreeNode ret = new PixelTreeNode();
+            PixelHistorTree.PixelTreeNode ret = new PixelHistorTree.PixelTreeNode();
 
             ret.eventID = eventID;
             ret.res = GetTex(tex);
 
             PixelModification[] history = GetHistory(r, tex);
 
-            if(history.Length == 0)
+            if (history.Length > 0)
             {
-                ret.leaftex = true;
-            }
-            else
-            {
+                TexAtEvent key2 = new TexAtEvent(tex, history.Last().eventID);
+
+                if (texnodeCache.ContainsKey(key2))
+                    return texnodeCache[key2];
+
                 foreach (var h in history)
                 {
                     if (h.EventPassed() && h.eventID < eventID)
@@ -2732,24 +2719,33 @@ namespace renderdocui.Windows
 
                         if ((draw.flags & DrawcallFlags.Clear) == 0)
                         {
-                            r.SetFrameEvent(curframe, h.eventID);
+                            PixelHistorTree.PixelTreeNode source = null;
 
-                            var pipe = r.GetD3D11PipelineState();
-
-                            PixelTreeNode source = new PixelTreeNode();
-
-                            source.eventID = h.eventID;
-                            source.value = h.postMod.col;
-                            source.leaftex = false;
-
-                            if (pipe.m_PS.ShaderDetails != null)
+                            if (modnodeCache.ContainsKey(h.eventID))
                             {
-                                foreach (var res in pipe.m_PS.ShaderDetails.Resources)
-                                {
-                                    if (!res.IsSRV) continue;
+                                source = modnodeCache[h.eventID];
+                            }
+                            else
+                            {
+                                r.SetFrameEvent(curframe, h.eventID);
 
-                                    source.sources.Add(PixelHistorTree_recurse(r, pipe.m_PS.SRVs[res.bindPoint].Resource, h.eventID));
+                                var pipe = r.GetD3D11PipelineState();
+
+                                source = new PixelHistorTree.PixelTreeNode();
+
+                                source.eventID = h.eventID;
+
+                                if (pipe.m_PS.ShaderDetails != null)
+                                {
+                                    foreach (var res in pipe.m_PS.ShaderDetails.Resources)
+                                    {
+                                        if (!res.IsSRV) continue;
+
+                                        source.sources.Add(PixelHistorTree_recurse(r, pipe.m_PS.SRVs[res.bindPoint].Resource, h.eventID));
+                                    }
                                 }
+
+                                modnodeCache.Add(h.eventID, source);
                             }
 
                             ret.sources.Add(source);
@@ -2757,29 +2753,45 @@ namespace renderdocui.Windows
                     }
                 }
 
-                ret.value = history.Last().postMod.col;
+                ret.eventID = key.EID = history.Last().eventID;
+            }
+            else
+            {
+                TexAtEvent key2 = new TexAtEvent(tex, 0);
+
+                if (texnodeCache.ContainsKey(key2))
+                    return texnodeCache[key2];
+
+                ret.eventID = key.EID = 0;
             }
 
-            nodeCache.Add(key, ret);
+            texnodeCache.Add(key, ret);
             
             return ret;
         }
 
-        private void PixelHistorTree(ReplayRenderer r)
+        private void PixelHistorTree_root(ReplayRenderer r)
         {
             curframe = m_Core.CurFrame;
             curevent = m_Core.CurEvent;
             historyCache = new Dictionary<ResourceId, PixelModification[]>();
-            nodeCache = new Dictionary<TexAtEvent, PixelTreeNode>();
+            texnodeCache = new Dictionary<TexAtEvent, PixelHistorTree.PixelTreeNode>();
+            modnodeCache = new Dictionary<uint, PixelHistorTree.PixelTreeNode>();
 
             var treeroot = PixelHistorTree_recurse(r, CurrentTexture.ID, curevent);
 
             r.SetFrameEvent(curframe, curevent);
+
+            this.BeginInvoke((MethodInvoker)delegate
+            {
+                var t = new PixelHistorTree(m_Core, treeroot);
+                t.Show(DockPanel);
+            });
         }
 
         private void pixelHistory_Click(object sender, EventArgs e)
         {
-            m_Core.Renderer.BeginInvoke(PixelHistorTree);
+            m_Core.Renderer.BeginInvoke(PixelHistorTree_root);
             /*
             PixelModification[] history = null;
 
