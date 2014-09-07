@@ -211,6 +211,12 @@
     <Compile Include="Windows\Dialogs\ColumnSelector.Designer.cs">
       <DependentUpon>ColumnSelector.cs</DependentUpon>
     </Compile>
+    <Compile Include="Windows\Dialogs\PixelHistorTree.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Windows\Dialogs\PixelHistorTree.Designer.cs">
+      <DependentUpon>PixelHistorTree.cs</DependentUpon>
+    </Compile>
     <Compile Include="Windows\Dialogs\RemoteHostSelect.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -333,6 +339,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Windows\Dialogs\ColumnSelector.resx">
       <DependentUpon>ColumnSelector.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Windows\Dialogs\PixelHistorTree.resx">
+      <DependentUpon>PixelHistorTree.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Windows\Dialogs\RemoteHostSelect.resx">
       <DependentUpon>RemoteHostSelect.cs</DependentUpon>
