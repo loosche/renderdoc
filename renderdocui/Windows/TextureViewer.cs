@@ -2665,7 +2665,7 @@ namespace renderdocui.Windows
             
             float curaspect = (float)CurrentTexture.width / (float)CurrentTexture.height;
             float newaspect = (float)fetchtex.width / (float)fetchtex.height;
-            if (Math.Abs(curaspect - newaspect) > 0.0001f)
+            if (Math.Abs(curaspect - newaspect) > 0.01f)
                 return new PixelModification[0] {};
 
             UInt32 x = (UInt32)(((float)m_PickedPoint.X / (float)CurrentTexture.width) * (float)fetchtex.width);
