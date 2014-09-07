@@ -61,6 +61,7 @@
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.Name = "PixelHistorTree";
             this.Text = "Pixel HistorTree";
+            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.PixelHistorTree_FormClosed);
             this.parent.ResumeLayout(false);
             this.ResumeLayout(false);
 

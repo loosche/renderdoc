@@ -2665,7 +2665,7 @@ namespace renderdocui.Windows
             
             float curaspect = (float)CurrentTexture.width / (float)CurrentTexture.height;
             float newaspect = (float)fetchtex.width / (float)fetchtex.height;
-            if (Math.Abs(curaspect - newaspect) > 0.01f)
+            if (Math.Abs(curaspect - newaspect) > 0.015f)
                 return new PixelModification[0] {};
 
             UInt32 x = (UInt32)(((float)m_PickedPoint.X / (float)CurrentTexture.width) * (float)fetchtex.width);
@@ -2674,7 +2674,9 @@ namespace renderdocui.Windows
             if (!historyCache.ContainsKey(tex))
             {
                 r.SetFrameEvent(curframe, curevent);
-                historyCache.Add(tex, r.PixelHistory(tex, (UInt32)x, (UInt32)y));
+                var history = r.PixelHistory(tex, (UInt32)x, (UInt32)y);
+                if(history == null) history = new PixelModification[0] {};
+                historyCache.Add(tex, history);
             }
 
             return historyCache[tex];
@@ -2787,7 +2789,7 @@ namespace renderdocui.Windows
 
             this.BeginInvoke((MethodInvoker)delegate
             {
-                var t = new PixelHistorTree(m_Core, treeroot);
+                var t = new PixelHistorTree(m_Core, treeroot, m_PickedPoint);
                 t.Show(DockPanel);
             });
         }
@@ -2795,6 +2797,7 @@ namespace renderdocui.Windows
         private void pixelHistory_Click(object sender, EventArgs e)
         {
             m_Core.Renderer.BeginInvoke(PixelHistorTree_root);
+
             /*
             PixelModification[] history = null;
 

@@ -15,9 +15,16 @@ namespace renderdocui.Windows.Dialogs
 {
     public partial class PixelHistorTree : DockContent
     {
+        private const int nodeWidth = 250;
+        private const int nodeHeight = 175;
+        private const int spaceWidth = 40;
+        private const int spaceHeight = 275;
+
         public class PixelTreeNode
         {
             public uint eventID = 0;
+
+            public FetchDrawcall draw = null;
 
             public List<PixelTreeNode> sources = new List<PixelTreeNode>();
 
@@ -31,13 +38,15 @@ namespace renderdocui.Windows.Dialogs
 
         private PixelTreeNode root = null;
         private Core m_Core = null;
+        private Point point = Point.Empty;
 
-        public PixelHistorTree(Core c, PixelTreeNode n)
+        public PixelHistorTree(Core c, PixelTreeNode n, Point p)
         {
             InitializeComponent();
 
             m_Core = c;
             root = n;
+            point = p;
 
             maxlayer = SetLayers(root, 1);
 
@@ -50,12 +59,51 @@ namespace renderdocui.Windows.Dialogs
             widestlayer = 0;
             for (int i = 0; i <= maxlayer; i++)
                 widestlayer = Math.Max(widestlayer, layers[i].Count);
+
+            bottomcentres = new List<Point>[maxlayer + 1];
+            topcentres = new List<Point>[maxlayer + 1];
+            for (int i = 0; i <= maxlayer; i++)
+            {
+                bottomcentres[i] = new List<Point>();
+                topcentres[i] = new List<Point>();
+
+                for (int w = 0; w < widestlayer; w++)
+                {
+                    bottomcentres[i].Add(new Point(0, 0));
+                    topcentres[i].Add(new Point(0, 0));
+                }
+            }
+
+            render.Size = new Size((nodeWidth + spaceWidth) * (widestlayer + 1), (nodeHeight + spaceHeight) * (maxlayer + 1));
+
+            for (int i = 0; i < paintdata.Length; i++)
+            {
+                Color col = HSLColor(GetHueForNode(i, paintdata.Length), 1.0f, 0.75f);
+
+                paintdata[i] = new PaintData();
+
+                paintdata[i].b = new SolidBrush(col);
+
+                paintdata[i].p = new Pen(col, 4.0f);
+                paintdata[i].p.CustomStartCap = new AdjustableArrowCap(5, 5);
+            }
         }
 
         private List<PixelTreeNode>[] layers = null;
+        private List<Point>[] bottomcentres = null;
+        private List<Point>[] topcentres = null;
+        private bool filled = false;
         private int widestlayer = 0;
         private int maxlayer = 0;
         private int globalindex = 0;
+
+        class PaintData
+        {
+            public Brush b = null;
+            public Pen p = null;
+        };
+
+        PaintData[] paintdata = new PaintData[16];
 
         private int SetLayers(PixelTreeNode node, int layer)
         {
@@ -80,6 +128,9 @@ namespace renderdocui.Windows.Dialogs
                 if (node.globalindex == 0)
                 {
                     node.globalindex = globalindex;
+
+                    node.draw = m_Core.GetDrawcall(m_Core.CurFrame, node.eventID);
+
                     globalindex++;
                 }
                 
@@ -90,10 +141,10 @@ namespace renderdocui.Windows.Dialogs
                 AssignLayers(s);
         }
 
-        private float GetHueForNode(int i)
+        private float GetHueForNode(int i, int total)
         {
-            int idx = ((i + 1) * 21) % 16; // space neighbouring colours reasonably distinctly
-            return (float)(idx) / 16.0f;
+            int idx = ((i + 1) * 21) % total; // space neighbouring colours reasonably distinctly
+            return (float)idx / (float)total;
         }
 
         // from https://gist.github.com/mjijackson/5311256
@@ -138,17 +189,22 @@ namespace renderdocui.Windows.Dialogs
 
         private void render_Paint(object sender, PaintEventArgs e)
         {
+            // mondo hack
+            if (!filled)
+                DoPaint(e.Graphics);
+
             DoPaint(e.Graphics);
 
             if (writeToFile)
             {
                 writeToFile = false;
 
-                string fileName = "T:/tmp/PixelHistorTree_test.png";
-                using (Bitmap bmp = new Bitmap(3000, 4000))
+                string fileName = "ShadeGraph_export.png";
+                using (Bitmap bmp = new Bitmap(render.Size.Width, render.Size.Height))
                 {
                     using (Graphics graphic = Graphics.FromImage(bmp))
                     {
+                        graphic.FillRectangle(Brushes.White, new Rectangle(0, 0, render.Size.Width, render.Size.Height));
                         DoPaint(graphic);
                     }
                     bmp.Save(fileName, System.Drawing.Imaging.ImageFormat.Png);
@@ -158,130 +214,112 @@ namespace renderdocui.Windows.Dialogs
 
         private void DoPaint(Graphics g)
         {
-            const int nodeWidth = 250;
-            const int nodeHeight = 175;
-            const int spaceWidth = 40;
-            const int spaceHeight = 275;
-
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
             Pen strokePen = new Pen(Brushes.Black, 4.0f);
             Font labelFont = new Font(FontFamily.GenericSerif, 14.0f, FontStyle.Bold);
 
+            StringFormat stringfmt = new StringFormat();
+
+            stringfmt.LineAlignment = StringAlignment.Far;
+            stringfmt.Alignment = StringAlignment.Center;
+
+            g.DrawString(String.Format("Shade graph for {0} ({1}, {2}) - {3}x{4}",
+                         root.res.name, point.X, point.Y, render.Size.Width, render.Size.Height),
+                         labelFont, Brushes.Black, new PointF(0, 0));
+
             int totalWidth = (nodeWidth + spaceWidth) * widestlayer;
 
-            var bottomcentres = new List<Point>[maxlayer+1];
-            var topcentres = new List<Point>[maxlayer+1];
-            for (int i = 0; i <= maxlayer; i++)
+            if (filled)
             {
-                bottomcentres[i] = new List<Point>();
-                topcentres[i] = new List<Point>();
-
-                for (int w = 0; w < widestlayer; w++)
+                for (int l = 0; l <= maxlayer; l++)
                 {
-                    bottomcentres[i].Add(new Point(0, 0));
-                    topcentres[i].Add(new Point(0, 0));
-                }
-            }
-
-            for (int hackhack = 0; hackhack < 2; hackhack++)
-            {
-                for (int l = maxlayer; l >= 0; l--)
-                {
-                    int layerwidth = layers[l].Count;
-
-                    int x = spaceWidth;
-                    int y = spaceHeight + (maxlayer - l) * (nodeHeight + spaceHeight);
-
-                    if (layerwidth < widestlayer)
-                    {
-                        int extra = (nodeWidth + spaceWidth) * (widestlayer - layerwidth);
-
-                        x += extra / 2;
-                    }
-
                     for (int i = 0; i < layers[l].Count; i++)
                     {
-                        if (hackhack == 1)
+                        Point from = topcentres[l][i];
+
+                        foreach (var s in layers[l][i].sources)
                         {
-                            Color c = HSLColor(GetHueForNode(layers[l][i].globalindex), 1.0f, 0.75f);
+                            Point to = bottomcentres[s.layer][s.index];
 
-                            using(Brush b = new SolidBrush(c))
-                                g.FillRectangle(b, new Rectangle(x, y, nodeWidth, nodeHeight));
-                            g.DrawRectangle(strokePen, new Rectangle(x, y, nodeWidth, nodeHeight));
-
-                            StringFormat fmt = new StringFormat();
-
-                            fmt.LineAlignment = StringAlignment.Far;
-                            fmt.Alignment = StringAlignment.Center;
-
-                            var rect = new RectangleF(x, y, nodeWidth, nodeHeight);
-                            rect.Inflate(new SizeF(-4.0f, -4.0f));
-
-                            string name = "";
-                            if (layers[l][i].res != null)
-                            {
-                                if (layers[l][i].eventID == 0)
-                                    name = layers[l][i].res.name;
-                                else
-                                    name = String.Format("{0} at EID {1}", layers[l][i].res.name, layers[l][i].eventID);
-                            }
-                            else
-                            {
-                                var draw = m_Core.GetDrawcall(m_Core.CurFrame, layers[l][i].eventID);
-
-                                /*
-                                string drawname = draw.parent.name;
-
-                                for (uint preveid = draw.eventID - 1; preveid > draw.previous.eventID; preveid--)
-                                {
-                                    var prevdraw = m_Core.GetDrawcall(m_Core.CurFrame, preveid);
-                                    if (prevdraw != null)
-                                    {
-                                        drawname = prevdraw.name;
-                                        break;
-                                    }
-                                }*/
-                                name = String.Format("Contribution from EID {0} - {1}", layers[l][i].eventID, draw.name);
-                            }
-
-                            g.DrawString(name, labelFont, Brushes.Black, rect, fmt);
-                        }
-
-                        bottomcentres[l][i] = new Point(x + nodeWidth / 2, y + nodeHeight + (int)(strokePen.Width*0.5f));
-                        topcentres[l][i] = new Point(x + nodeWidth / 2, y - (int)(strokePen.Width*0.5f));
-
-                        x += nodeWidth + spaceWidth;
-                    }
-                }
-
-                if (hackhack == 0)
-                {
-                    for (int l = 0; l <= maxlayer; l++)
-                    {
-                        for (int i = 0; i < layers[l].Count; i++)
-                        {
-                            Point from = topcentres[l][i];
-
-                            Color c = HSLColor(GetHueForNode(layers[l][i].globalindex), 1.0f, 0.75f);
-
-                            Pen linePen = new Pen(c, 4.0f);
-                            linePen.CustomStartCap = new AdjustableArrowCap(5, 5);
-
-                            foreach (var s in layers[l][i].sources)
-                            {
-                                Point to = bottomcentres[s.layer][s.index];
-
-                                g.DrawLine(linePen, from, to);
-                            }
-
-                            linePen.Dispose();
+                            g.DrawLine(paintdata[layers[l][i].globalindex % paintdata.Length].p, from, to);
                         }
                     }
                 }
             }
 
+            for (int l = maxlayer; l >= 0; l--)
+            {
+                int layerwidth = layers[l].Count;
+
+                int x = spaceWidth;
+                int y = spaceHeight/2 + (maxlayer - l) * (nodeHeight + spaceHeight);
+
+                if (layerwidth < widestlayer)
+                {
+                    int extra = (nodeWidth + spaceWidth) * (widestlayer - layerwidth);
+
+                    x += extra / 2;
+                }
+
+                for (int i = 0; i < layers[l].Count; i++)
+                {
+                    g.FillRectangle(paintdata[layers[l][i].globalindex % paintdata.Length].b, new Rectangle(x, y, nodeWidth, nodeHeight));
+                    g.DrawRectangle(strokePen, new Rectangle(x, y, nodeWidth, nodeHeight));
+
+                    var rect = new RectangleF(x, y, nodeWidth, nodeHeight);
+                    rect.Inflate(new SizeF(-4.0f, -4.0f));
+
+                    string name = "";
+                    if (layers[l][i].res != null)
+                    {
+                        if (layers[l][i].eventID == 0)
+                            name = layers[l][i].res.name;
+                        else
+                            name = String.Format("{0} at EID {1}", layers[l][i].res.name, layers[l][i].eventID);
+                    }
+                    else
+                    {
+                        /*
+                        string drawname = draw.parent.name;
+
+                        for (uint preveid = draw.eventID - 1; preveid > draw.previous.eventID; preveid--)
+                        {
+                            var prevdraw = m_Core.GetDrawcall(m_Core.CurFrame, preveid);
+                            if (prevdraw != null)
+                            {
+                                drawname = prevdraw.name;
+                                break;
+                            }
+                        }*/
+                        name = String.Format("Contribution from EID {0} - {1}", layers[l][i].eventID, layers[l][i].draw.name);
+                    }
+
+                    g.DrawString(name, labelFont, Brushes.Black, rect, stringfmt);
+
+                    if (!filled)
+                    {
+                        bottomcentres[l][i] = new Point(x + nodeWidth / 2, y + nodeHeight + (int)(strokePen.Width * 0.5f));
+                        topcentres[l][i] = new Point(x + nodeWidth / 2, y - (int)(strokePen.Width * 0.5f));
+                    }
+
+                    x += nodeWidth + spaceWidth;
+                }
+            }
+
+            filled = true;
+
             strokePen.Dispose();
+            stringfmt.Dispose();
+        }
+
+        private void PixelHistorTree_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            for (int i = 0; i < paintdata.Length; i++)
+            {
+                paintdata[i].b.Dispose();
+                paintdata[i].p.Dispose();
+            }
         }
     }
 }
