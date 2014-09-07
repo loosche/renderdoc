@@ -1,6 +1,6 @@
 ﻿namespace renderdocui.Windows.Dialogs
 {
-    partial class PixelHistorTree
+    partial class PixelShadeGraph
     {
         /// <summary>
         /// Required designer variable.
@@ -52,16 +52,16 @@
             this.render.TabIndex = 0;
             this.render.Paint += new System.Windows.Forms.PaintEventHandler(this.render_Paint);
             // 
-            // PixelHistorTree
+            // PixelShadeGraph
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(292, 273);
             this.Controls.Add(this.parent);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.Name = "PixelHistorTree";
-            this.Text = "Pixel HistorTree";
-            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.PixelHistorTree_FormClosed);
+            this.Name = "PixelShadeGraph";
+            this.Text = "Pixel Shade Graph";
+            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.PixelShadeGraph_FormClosed);
             this.parent.ResumeLayout(false);
             this.ResumeLayout(false);
 

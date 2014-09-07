@@ -1,4 +1,28 @@
-﻿using System;
+﻿/******************************************************************************
+ * The MIT License (MIT)
+ * 
+ * Copyright (c) 2014 Baldur Karlsson
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ ******************************************************************************/
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -13,7 +37,7 @@ using System.Drawing.Drawing2D;
 
 namespace renderdocui.Windows.Dialogs
 {
-    public partial class PixelHistorTree : DockContent
+    public partial class PixelShadeGraph : DockContent
     {
         private const int nodeWidth = 250;
         private const int nodeHeight = 175;
@@ -40,7 +64,7 @@ namespace renderdocui.Windows.Dialogs
         private Core m_Core = null;
         private Point point = Point.Empty;
 
-        public PixelHistorTree(Core c, PixelTreeNode n, Point p)
+        public PixelShadeGraph(Core c, PixelTreeNode n, Point p)
         {
             InitializeComponent();
 
@@ -313,7 +337,7 @@ namespace renderdocui.Windows.Dialogs
             stringfmt.Dispose();
         }
 
-        private void PixelHistorTree_FormClosed(object sender, FormClosedEventArgs e)
+        private void PixelShadeGraph_FormClosed(object sender, FormClosedEventArgs e)
         {
             for (int i = 0; i < paintdata.Length; i++)
             {

@@ -2689,17 +2689,17 @@ namespace renderdocui.Windows
             public uint EID;
         };
 
-        private Dictionary<TexAtEvent, PixelHistorTree.PixelTreeNode> texnodeCache = null;
-        private Dictionary<uint, PixelHistorTree.PixelTreeNode> modnodeCache = null;
+        private Dictionary<TexAtEvent, PixelShadeGraph.PixelTreeNode> texnodeCache = null;
+        private Dictionary<uint, PixelShadeGraph.PixelTreeNode> modnodeCache = null;
 
-        private PixelHistorTree.PixelTreeNode PixelHistorTree_recurse(ReplayRenderer r, ResourceId tex, uint eventID)
+        private PixelShadeGraph.PixelTreeNode PixelShadeGraph_recurse(ReplayRenderer r, ResourceId tex, uint eventID)
         {
             TexAtEvent key = new TexAtEvent(tex, eventID);
 
             if (texnodeCache.ContainsKey(key))
                 return texnodeCache[key];
 
-            PixelHistorTree.PixelTreeNode ret = new PixelHistorTree.PixelTreeNode();
+            PixelShadeGraph.PixelTreeNode ret = new PixelShadeGraph.PixelTreeNode();
 
             ret.eventID = eventID;
             ret.res = GetTex(tex);
@@ -2721,7 +2721,7 @@ namespace renderdocui.Windows
 
                         if ((draw.flags & DrawcallFlags.Clear) == 0)
                         {
-                            PixelHistorTree.PixelTreeNode source = null;
+                            PixelShadeGraph.PixelTreeNode source = null;
 
                             if (modnodeCache.ContainsKey(h.eventID))
                             {
@@ -2733,7 +2733,7 @@ namespace renderdocui.Windows
 
                                 var pipe = r.GetD3D11PipelineState();
 
-                                source = new PixelHistorTree.PixelTreeNode();
+                                source = new PixelShadeGraph.PixelTreeNode();
 
                                 source.eventID = h.eventID;
 
@@ -2743,7 +2743,7 @@ namespace renderdocui.Windows
                                     {
                                         if (!res.IsSRV) continue;
 
-                                        source.sources.Add(PixelHistorTree_recurse(r, pipe.m_PS.SRVs[res.bindPoint].Resource, h.eventID));
+                                        source.sources.Add(PixelShadeGraph_recurse(r, pipe.m_PS.SRVs[res.bindPoint].Resource, h.eventID));
                                     }
                                 }
 
@@ -2775,28 +2775,28 @@ namespace renderdocui.Windows
             return ret;
         }
 
-        private void PixelHistorTree_root(ReplayRenderer r)
+        private void PixelShadeGraph_root(ReplayRenderer r)
         {
             curframe = m_Core.CurFrame;
             curevent = m_Core.CurEvent;
             historyCache = new Dictionary<ResourceId, PixelModification[]>();
-            texnodeCache = new Dictionary<TexAtEvent, PixelHistorTree.PixelTreeNode>();
-            modnodeCache = new Dictionary<uint, PixelHistorTree.PixelTreeNode>();
+            texnodeCache = new Dictionary<TexAtEvent, PixelShadeGraph.PixelTreeNode>();
+            modnodeCache = new Dictionary<uint, PixelShadeGraph.PixelTreeNode>();
 
-            var treeroot = PixelHistorTree_recurse(r, CurrentTexture.ID, curevent);
+            var treeroot = PixelShadeGraph_recurse(r, CurrentTexture.ID, curevent);
 
             r.SetFrameEvent(curframe, curevent);
 
             this.BeginInvoke((MethodInvoker)delegate
             {
-                var t = new PixelHistorTree(m_Core, treeroot, m_PickedPoint);
+                var t = new PixelShadeGraph(m_Core, treeroot, m_PickedPoint);
                 t.Show(DockPanel);
             });
         }
 
         private void pixelHistory_Click(object sender, EventArgs e)
         {
-            m_Core.Renderer.BeginInvoke(PixelHistorTree_root);
+            m_Core.Renderer.BeginInvoke(PixelShadeGraph_root);
 
             /*
             PixelModification[] history = null;
