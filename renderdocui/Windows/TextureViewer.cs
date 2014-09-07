@@ -2765,7 +2765,10 @@ namespace renderdocui.Windows
                 ret.eventID = key.EID = 0;
             }
 
-            texnodeCache.Add(key, ret);
+            if (texnodeCache.ContainsKey(key))
+                texnodeCache[key] = ret;
+            else
+                texnodeCache.Add(key, ret);
             
             return ret;
         }

@@ -230,6 +230,7 @@ namespace renderdocui.Windows.Dialogs
                             {
                                 var draw = m_Core.GetDrawcall(m_Core.CurFrame, layers[l][i].eventID);
 
+                                /*
                                 string drawname = draw.parent.name;
 
                                 for (uint preveid = draw.eventID - 1; preveid > draw.previous.eventID; preveid--)
@@ -240,8 +241,8 @@ namespace renderdocui.Windows.Dialogs
                                         drawname = prevdraw.name;
                                         break;
                                     }
-                                }
-                                name = String.Format("Contribution from EID {0} - {1}", layers[l][i].eventID, drawname);
+                                }*/
+                                name = String.Format("Contribution from EID {0} - {1}", layers[l][i].eventID, draw.name);
                             }
 
                             g.DrawString(name, labelFont, Brushes.Black, rect, fmt);
