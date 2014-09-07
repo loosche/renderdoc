@@ -277,6 +277,11 @@ namespace renderdoc
         public TextureCreationFlags creationFlags;
         public UInt32 msQual, msSamp;
         public UInt64 byteSize;
+
+        public override string ToString()
+        {
+            return name;
+        }
     };
 
     [StructLayout(LayoutKind.Sequential)]

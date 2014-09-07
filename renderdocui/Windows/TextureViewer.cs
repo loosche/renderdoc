@@ -2404,6 +2404,9 @@ namespace renderdocui.Windows
 
         private void zoomRange_Click(object sender, EventArgs e)
         {
+            var t = new Windows.Dialogs.PixelHistorTree();
+            t.Show(DockPanel);
+
             float black = rangeHistogram.BlackPoint;
             float white = rangeHistogram.WhitePoint;
 
@@ -2640,8 +2643,144 @@ namespace renderdocui.Windows
             render.Invalidate();
         }
 
+        private Dictionary<ResourceId, PixelModification[]> historyCache = null;
+
+        class PixelTreeNode
+        {
+            public uint eventID = 0;
+
+            public List<PixelTreeNode> sources = new List<PixelTreeNode>();
+
+            public bool leaftex = true;
+
+            public FetchTexture res = null;
+            public PixelValue value = null;
+        };
+
+        private FetchTexture GetTex(ResourceId tex)
+        {
+            foreach (var t in m_Core.CurTextures)
+            {
+                if (t.ID == tex)
+                    return t;
+            }
+
+            return null;
+        }
+
+        private uint curframe = 0;
+        private uint curevent = 0;
+
+        private PixelModification[] GetHistory(ReplayRenderer r, ResourceId tex)
+        {
+            if(tex == ResourceId.Null)
+                return new PixelModification[0] { };
+            var fetchtex = GetTex(tex);
+
+            
+            float curaspect = (float)CurrentTexture.width / (float)CurrentTexture.height;
+            float newaspect = (float)fetchtex.width / (float)fetchtex.height;
+            if (Math.Abs(curaspect - newaspect) > 0.0001f)
+                return new PixelModification[0] {};
+
+            UInt32 x = (UInt32)(((float)m_PickedPoint.X / (float)CurrentTexture.width) * (float)fetchtex.width);
+            UInt32 y = (UInt32)(((float)m_PickedPoint.Y / (float)CurrentTexture.height) * (float)fetchtex.height);
+
+            if (!historyCache.ContainsKey(tex))
+            {
+                r.SetFrameEvent(curframe, curevent);
+                historyCache.Add(tex, r.PixelHistory(tex, (UInt32)x, (UInt32)y));
+            }
+
+            return historyCache[tex];
+        }
+
+        struct TexAtEvent
+        {
+            public TexAtEvent(ResourceId t, uint e) { tex = t; EID = e; }
+            public ResourceId tex;
+            public uint EID;
+        };
+
+        private Dictionary<TexAtEvent, PixelTreeNode> nodeCache = null;
+
+        private PixelTreeNode PixelHistorTree_recurse(ReplayRenderer r, ResourceId tex, uint eventID)
+        {
+            TexAtEvent key = new TexAtEvent(tex, eventID);
+
+            if (nodeCache.ContainsKey(key))
+                return nodeCache[key];
+
+            PixelTreeNode ret = new PixelTreeNode();
+
+            ret.eventID = eventID;
+            ret.res = GetTex(tex);
+
+            PixelModification[] history = GetHistory(r, tex);
+
+            if(history.Length == 0)
+            {
+                ret.leaftex = true;
+            }
+            else
+            {
+                foreach (var h in history)
+                {
+                    if (h.EventPassed() && h.eventID < eventID)
+                    {
+                        var draw = m_Core.GetDrawcall(curframe, h.eventID);
+
+                        if ((draw.flags & DrawcallFlags.Clear) == 0)
+                        {
+                            r.SetFrameEvent(curframe, h.eventID);
+
+                            var pipe = r.GetD3D11PipelineState();
+
+                            PixelTreeNode source = new PixelTreeNode();
+
+                            source.eventID = h.eventID;
+                            source.value = h.postMod.col;
+                            source.leaftex = false;
+
+                            if (pipe.m_PS.ShaderDetails != null)
+                            {
+                                foreach (var res in pipe.m_PS.ShaderDetails.Resources)
+                                {
+                                    if (!res.IsSRV) continue;
+
+                                    source.sources.Add(PixelHistorTree_recurse(r, pipe.m_PS.SRVs[res.bindPoint].Resource, h.eventID));
+                                }
+                            }
+
+                            ret.sources.Add(source);
+                        }
+                    }
+                }
+
+                ret.value = history.Last().postMod.col;
+            }
+
+            nodeCache.Add(key, ret);
+            
+            return ret;
+        }
+
+        private void PixelHistorTree(ReplayRenderer r)
+        {
+            curframe = m_Core.CurFrame;
+            curevent = m_Core.CurEvent;
+            historyCache = new Dictionary<ResourceId, PixelModification[]>();
+            nodeCache = new Dictionary<TexAtEvent, PixelTreeNode>();
+
+            var treeroot = PixelHistorTree_recurse(r, CurrentTexture.ID, curevent);
+
+            r.SetFrameEvent(curframe, curevent);
+        }
+
         private void pixelHistory_Click(object sender, EventArgs e)
         {
+            m_Core.Renderer.BeginInvoke(PixelHistorTree);
+            /*
             PixelModification[] history = null;
 
             PixelHistoryView hist = new PixelHistoryView(m_Core, CurrentTexture, m_PickedPoint,
@@ -2666,7 +2805,7 @@ namespace renderdocui.Windows
                     }));
                 });
             };
-            delayedHistory.RunWorkerAsync();
+            delayedHistory.RunWorkerAsync();*/
         }
 
         private void debugPixel_Click(object sender, EventArgs e)
